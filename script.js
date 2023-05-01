@@ -191,7 +191,19 @@ let changeContent = (element, newContent = "", option = "renew") => {
     } else element.innerText = newContent
 }
 
-let lang = "en"
+let lang = localStorage.getItem("lang")
+    ? JSON.parse(localStorage.getItem("lang"))
+    : "en"
+console.log('lang: ', lang)
+
+const langSwitch = createKey({
+    element: "p",
+    className: "langSwitch",
+    isInBody: true,
+    content:
+        "press Shift + Alt to switch the language\nнажмите Shift + Alt чтобы переключить язык",
+})
+
 let isShiftPressed = false
 let isCaps = false
 
@@ -200,6 +212,7 @@ const display = createKey({
     id: "display",
     isInBody: true,
 })
+
 const keyboard = createKey({
     element: "div",
     className: "keyboard",
@@ -207,37 +220,53 @@ const keyboard = createKey({
     isInBody: true,
 })
 
-let elements = keys[lang].map((el) => {
-    let button = createKey({
-        element: "div",
-        className: "key" + (el[2] ? " " + el[2] : ""),
-        id: el[1],
-    })
-    if (el[0].indexOf(" ") >= 0) {
-        el[0].split(" ").forEach((el, i) => {
-            setRelation(
-                button,
-                createKey({
-                    element: "span",
-                    className: i === 0 ? "upper-symbol" : "lower-symbol",
-                    content: el,
-                })
-            )
+let fillKeyboard = () => {
+    keys[lang].map((el) => {
+        let key = createKey({
+            element: "div",
+            className: "key" + (el[2] ? " " + el[2] : ""),
+            id: el[1],
         })
-        button.classList.add("multi-symbol")
-    } else changeContent(button, el[0])
-    setRelation(keyboard, button)
-    button.addEventListener("mousedown", (e) => buttonDown(e))
-    button.addEventListener("mouseup", (e) => buttonUp(e))
-    return button
-})
+        if (el[0].indexOf(" ") >= 0) {
+            el[0].split(" ").forEach((el, i) => {
+                setRelation(
+                    key,
+                    createKey({
+                        element: "span",
+                        className: i === 0 ? "upper-symbol" : "lower-symbol",
+                        content: el,
+                    })
+                )
+            })
+            key.classList.add("multi-symbol")
+        } else changeContent(key, el[0])
+        setRelation(keyboard, key)
+        key.addEventListener("mousedown", (e) => keyDown(e))
+        key.addEventListener("mouseup", (e) => keyUp(e))
+        return key
+    })
+}
+fillKeyboard()
 
-let buttonDown = (e) => {
+let keyDown = (e) => {
     let element = e.code ? document.getElementById(e.code) : e.target
     element.classList.add("_pressed")
     if (element.id === "ShiftLeft" || element.id === "ShiftRight") {
-        isShiftPressed = isCaps ? !isShiftPressed : true
+        isShiftPressed = true
         console.log("isShiftPressed: ", isShiftPressed)
+        return
+    }
+    if (element.id === "AltLeft" || element.id === "AltRight") {
+        if (isShiftPressed) {
+            lang = lang === "en" ? "ru" : "en"
+
+            localStorage.removeItem("lang")
+            localStorage.setItem("lang", JSON.stringify(lang))
+
+            keyboard.innerHTML = ""
+            fillKeyboard()
+        }
+        changeContent(display, " ", "add")
         return
     }
     if (element.id === "Space") {
@@ -263,19 +292,22 @@ let buttonDown = (e) => {
             ? element.firstChild.innerText
             : element.lastChild.innerText
         : isShiftPressed
-            ? element.innerText
-            : element.innerText.toLowerCase()
+            ? isCaps
+                ? element.innerText.toLowerCase()
+                : element.innerText
+            : isCaps
+                ? element.innerText
+                : element.innerText.toLowerCase()
     changeContent(display, text, "add")
 }
 
-let buttonUp = (e) => {
+let keyUp = (e) => {
     let element = e.code ? document.getElementById(e.code) : e.target
     element.classList.remove("_pressed")
     if (element.id === "ShiftLeft" || element.id === "ShiftRight")
-        isShiftPressed = isCaps ? !isShiftPressed : false
+        isShiftPressed = false
     if (element.id === "CapsLock") {
         isCaps = !isCaps
-        isShiftPressed = !isShiftPressed
     }
 }
 
@@ -284,7 +316,8 @@ let moveCursor = (direction) => {
         case "Left":
             if (cursorPosition === 0) return
             typedText =
-                typedText.substring(0, cursorPosition - 1) + "|" +
+                typedText.substring(0, cursorPosition - 1) +
+                "|" +
                 typedText.substring(cursorPosition - 1, cursorPosition) +
                 typedText.substring(cursorPosition + 1)
             cursorPosition--
@@ -294,14 +327,16 @@ let moveCursor = (direction) => {
             if (cursorPosition === typedText.length - 1) return
             typedText =
                 typedText.substring(0, cursorPosition) +
-                typedText.substring(cursorPosition + 1, cursorPosition + 2) + "|" +
+                typedText.substring(cursorPosition + 1, cursorPosition + 2) +
+                "|" +
                 typedText.substring(cursorPosition + 2)
             cursorPosition++
             display.innerText = typedText
             break
         case "Up":
             if (cursorPosition === 0) return
-            typedText = "|" +
+            typedText =
+                "|" +
                 typedText.substring(0, cursorPosition) +
                 typedText.substring(cursorPosition + 1)
             cursorPosition = 0
@@ -311,7 +346,8 @@ let moveCursor = (direction) => {
             if (cursorPosition === typedText.length - 1) return
             typedText =
                 typedText.substring(0, cursorPosition) +
-                typedText.substring(cursorPosition + 1) + "|"
+                typedText.substring(cursorPosition + 1) +
+                "|"
             cursorPosition = typedText.length - 1
             display.innerText = typedText
             break
@@ -320,5 +356,5 @@ let moveCursor = (direction) => {
     }
 }
 
-document.addEventListener("keydown", (e) => buttonDown(e))
-document.addEventListener("keyup", (e) => buttonUp(e))
+document.addEventListener("keydown", (e) => keyDown(e))
+document.addEventListener("keyup", (e) => keyUp(e))
